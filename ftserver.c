@@ -1,3 +1,15 @@
+/*
+   ftserver.c - ftserver is a TCP file transfer program that operates in conjuncture with ftclient.py.
+                ftserver will wait on <CONTROL_PORT_NUM> specified at launch for incoming connections from
+                ftclient. When a connection is made ftserver will parse the incoming command and fulfill
+                the request if possible. The options allowed are <-g> <FILENAME> to get a file and <-l> 
+                to list ftserver's directory contents. ftserver will continue to listen on <CONTROL_PORT_NUM>
+                until the SIG_INT signal is sent (cntl^c).
+
+        usage - ./ftserver <CONTROL_PORT_NUM>
+      example - ./ftserver 30020
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -12,22 +24,66 @@
 #include <errno.h>
 #include <assert.h>
 #include <limits.h>
+#include <signal.h>
 
+//----------------------------------------------------------------------
+//         Define boolean values (not needed, just a habit).
+//----------------------------------------------------------------------
 typedef enum{FALSE, TRUE}bool;
 
+//----------------------------------------------------------------------
+//                Connection Return Data (CRD) struct. 
+//----------------------------------------------------------------------
+// members: struct addrinfo * ai -> connection addrinfo struct
+//          int sfd -> connection socket file descriptor
+//----------------------------------------------------------------------
+//Holds the needed socket info after a call to initializeConnection(), 
+//which is defined below.
+//----------------------------------------------------------------------
 typedef struct ConnectionReturnData{
     struct addrinfo * ai;
     int sfd;
 }CRD;
 
-void validateArgs(int ac){
+//----------------------------------------------------------------------
+//                      void validateArgs(int ac)
+//----------------------------------------------------------------------
+// params: int ac -> expects argc 
+//         const char* av -> expects argv
+//----------------------------------------------------------------------
+//Validates that there are the correct number of agruments to run
+//ftserver [arg[0]=ftserver, arg[1]=<CONTROL_PORT_NUM>]. Also validates 
+//that <CONTROL_PORT_NUM> in the range {1025,...,65534} inclusive. 
+//----------------------------------------------------------------------
+void validateArgs(int ac, char const* av){
+
     if(ac != 2){
         fprintf(stderr, "Need two arguments(%d)\n", ac);
         exit(1);
     }
+
+    int v = stoi(av[1]);
+    if( v <= 1024 || v >= 65535){
+        fprintf(stderr, "Need port number in range {1025,...,65534} (%d)\n", v);
+        exit(1);
+    }
 }
 
+//-------------------------------------------------------------------------------
+//       CRD initializeConnection(char* ip, char* port, bool isListener)
+//-------------------------------------------------------------------------------
+//Params:  char* ip -> expects pointer to string with <HOST_NAME> 
+//         char* port -> expects pointer to string with <CONTROL_PORT_NUM>
+//         bool isListener -> True, if this connection is the control connection
+//                            False, if this is the data connection
+//-------------------------------------------------------------------------------
+//Creates a socket then connects or binds depending on the value of isListener. 
+//Will exit the program upon any connect(), bind() or getaddrinfo() errors.
+//-------------------------------------------------------------------------------
+//Returns: a CRD struct with the new connections information.
+//-------------------------------------------------------------------------------
 CRD initializeConnection(char* ip, char* port, bool isListener){
+
     CRD conReturn;
     struct addrinfo hints;
     int status;
@@ -79,10 +135,16 @@ CRD initializeConnection(char* ip, char* port, bool isListener){
             exit(1);
         }
     }
-
     return conReturn;
 }
 
+//-------------------------------------------------------------------------------
+//                          void buildDir()
+//-------------------------------------------------------------------------------
+//Builds a list of the directory contents and saves it to 'DIR.txt'. This file 
+//will be created and sent when ftclient requests the current directory (-l).
+//Only lists files no directories.  
+//-------------------------------------------------------------------------------
 void buildDir(){
 	DIR *dir;
 	struct dirent *ent;
@@ -93,8 +155,9 @@ void buildDir(){
 		exit(1);
 	}
 	if(dir != NULL){
-		while(ent = readdir(dir)){
+		while((ent = readdir(dir))){
 			char e = ent->d_name[0]; 
+            //Only print file names
 			if( e == '.' || e == '_'){
 				continue;
 			}
@@ -110,17 +173,31 @@ void buildDir(){
 	fclose(text);
 }
 
+//-------------------------------------------------------------------------------
+//         void mSendFile(char* ip, char* port, char* file, int sockfd)
+//-------------------------------------------------------------------------------
+// params: char* ip -> expects pointer to string with <HOST_NAME> 
+//         char* port -> expects pointer to string with <CONTROL_PORT_NUM>
+//         char* file -> expects pointer to string with <FILENAME>
+//         int sockfd -> expects socket file descriptor for control connection
+//-------------------------------------------------------------------------------
+//Creates a new data connection then sends the requested file if it is present. If 
+//the file doesn't exist then a message is sent to ftclient on the control 
+//connection. And the send iss aborted. Files sent can include 'DIR.txt' if the 
+//command from ftclient was (-l) list.
+//-------------------------------------------------------------------------------
 void mSendFile(char* ip, char* port, char* file, int sockfd){
+    //sleep to allow ftclient to connect
     sleep(5);
     CRD dataconnection = initializeConnection(ip, port, FALSE);
     FILE *fp;
-    
+    //open the file
     int temp = open(file, O_RDONLY);
     if(temp <= 0){
         exit(1);
     }
-
     fp = fdopen(temp, "rb");
+    //if the file doesn't exist
     if(!fp){
         printf("Error %d\n", errno);
         fflush(stdout);
@@ -134,11 +211,12 @@ void mSendFile(char* ip, char* port, char* file, int sockfd){
     else{
         char* mesg= "FILE-FOUND\0";
         write(sockfd, mesg, strlen(mesg));
+        //get file length and prepare to read/write until file sent
         fseek(fp, 0, SEEK_END);
         size_t fpsize = ftell(fp);
         fseek(fp, 0, SEEK_SET);
         char* buffer = malloc(fpsize + 1);
-        size_t read, wrote, total =0;
+        size_t read, wrote, total = 0;
         while(!feof(fp)){
             read = fread(buffer, 1, 1024, fp);
             buffer[read] = '\0';
@@ -156,6 +234,17 @@ void mSendFile(char* ip, char* port, char* file, int sockfd){
     }
 }
 
+//-------------------------------------------------------------------------------
+//                  void requestHandler(int sockfd, char* ip)
+//-------------------------------------------------------------------------------
+// params: int sockfd -> expects socket file descriptor for control connection
+//         char* ip -> expects pointer to string with <HOST_NAME> 
+//-------------------------------------------------------------------------------
+//Parses and validates new incoming requests on the control connection. If the
+//request is good a verification message is sent to ftclient and the request 
+//contents are sent to mSendFile(). If the request is bad an error message is
+//sent and ftserver will go back to waiting for requests on <CONTROL_PORT_NUM>. 
+//-------------------------------------------------------------------------------
 void requestHandler(int sockfd, char* ip){
     char* buffer = malloc(1025);
     char port[64] = {'\0'};
@@ -184,6 +273,7 @@ void requestHandler(int sockfd, char* ip){
     memcpy(cmd, token, strlen(token));
     cmd[strlen(token)] = '\0';
     token = strtok(NULL, " \0\n");
+    //if there is a filename get it, else set filename to 'NA'.
     if(token == NULL){
         memcpy(file, "NA", strlen("NA"));
         file[strlen("NA")] = '\0';
@@ -192,6 +282,9 @@ void requestHandler(int sockfd, char* ip){
         memcpy(file, token, strlen(token));
         file[strlen(token)] = '\0';
     }
+    //If the command is (-l) list, build the directory file and 
+    //send the request confirmation. Then set the filename 
+    //to 'DIR.txt' and send the directory file to ftclient. 
     if(strcmp(cmd, "-l") == 0){
         buildDir();
         write(sockfd, goodReq , strlen(goodReq));
@@ -202,12 +295,15 @@ void requestHandler(int sockfd, char* ip){
         mSendFile(ip, p, f, sockfd);
         printf("Directory contents sent to %s:%s\n", ip, port);
     }
+    //If the command is (-g) get, send the request confirmation
+    //then send the requested file. 
     else if(strcmp(cmd, "-g") == 0){
         write(sockfd, goodReq , strlen(goodReq));
         printf("File '%s' requested on port %s\n", file, port);
         mSendFile(ip, p, f, sockfd);
         printf("File '%s' sent to %s:%s\n", file, ip, port);
     }
+    //If the command was bad send the bad request message
     else{
         write(sockfd, badReq , strlen(badReq));
     }
@@ -215,6 +311,17 @@ void requestHandler(int sockfd, char* ip){
     free(buffer);
 }
 
+//-------------------------------------------------------------------------------
+//       void listenWait(int sockfd)
+//-------------------------------------------------------------------------------
+// params: int sockfd -> expects socket file descriptor for control connection
+//-------------------------------------------------------------------------------
+//Main listener loop. ftserver waits on <CONTROL_PORT_NUM> for incoming connections
+//from ftclient. When a new connection is established ftclient's <hostname> is 
+//extracted and sent to requestHandler() to complete the request. If a SIG_INT is
+//sent it will be caught by accept(). When this happens the loop is broken and 
+//all files and sockets will be closed before ftserver terminates.
+//-------------------------------------------------------------------------------
 void listenWait(int sockfd){
     struct sockaddr_in callerAddr;
     socklen_t addrSize;
@@ -226,6 +333,9 @@ void listenWait(int sockfd){
         fd = accept(sockfd, (struct sockaddr *)&callerAddr, &addrSize);
         if(fd == -1){
             continue;
+        }
+        if(errno == EINTR){
+        	break;
         }
         else{
             res = getpeername(fd, (struct sockaddr *)&callerAddr, &addrSize);
@@ -239,12 +349,16 @@ void listenWait(int sockfd){
     free(ip);
 }
 
-int main(int argc, char const *argv[])
-{
-    validateArgs(argc);
+int main(int argc, char const *argv[]){
+    //validate args
+    validateArgs(argc, argv);
+    //setup control port
     CRD listenConnection = initializeConnection(NULL, (char*) argv[1], TRUE);
+    //wait for ftclient
     listenWait(listenConnection.sfd);
+    //clean up
     freeaddrinfo(listenConnection.ai);
+    close(listenConnection.sfd);
     return 0;
 }
 

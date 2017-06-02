@@ -4,11 +4,33 @@ import sys
 import errno
 import os
 
-
-# File Transfer Client class
-# see member function decriptions below
+#---------------------------------------------------------------------------------
+#                  File Transfer Client class ( FTClient )                        
+#---------------------------------------------------------------------------------
+# attributes: FTClient.clientsocket - control connection socket file descriptor 
+#             FTClient.datasocket - data connection socket file descriptor        
+#             FTClient.serverport - control connection port number
+#             FTClient.dataport - data connection port number 
+#			  FTClient.serverhost - ftservers hostname
+#             FTClient.command - command to send 
+#             FTClient.filename - file to request ('NA' if command is -l list)
+#---------------------------------------------------------------------------------
+# functions:  FTClient.__init__(self)
+#             FTClient.__del__(self)
+#             FTClient.isValid(self)
+#             FTClient.changeFileName(self)
+#             FTClient.connect(self, isDataSocket)
+#             FTClient.sendCommand(self)
+#             FTClient.recieveFile(self)
+#        ** see member function decriptions below **
+#---------------------------------------------------------------------------------
+# 
 class FTClient(object):
 
+	#===============================FTClient.__init__()===========================
+	# Creates a new FTClient object with the command arguments
+	# provided at launch
+	#=============================================================================
 	def __init__(self):
 		self.clientsocket = "NONE"
 		self.datasocket = "NONE"
@@ -25,6 +47,10 @@ class FTClient(object):
 			print "Invalid number of arguments"
 			exit(1)
 
+	#===============================FTClient.__del__()===========================
+	# Deletes an existing FTClient object while closing sockets.
+	# Used on exit.
+	#============================================================================
 	def __del__(self):
 		if self.clientsocket != "NONE":
 			print "Closing clientsocket..."
@@ -33,6 +59,9 @@ class FTClient(object):
 			print "Closing datasocket..."
 			self.datasocket.close()
 
+	#===============================FTClient.isValid()===========================
+	# validates FTClient's port number and commands from launch
+	#============================================================================
 	def isValid(self):
 		sp = int(self.serverport)
 		if sp >= 65535 or sp <= 1024:
@@ -47,6 +76,10 @@ class FTClient(object):
 			print os.strerror(errno.EINVAL) + "(dataport)"
 			exit(1)
 
+	#===============================FTClient.changeFileName()===========================
+	# Changes the filename for the file recieved from ftserver if needed.
+	# Appends (1),(2),etc...  Ex. 'file.txt' --> 'file(1).txt' 
+	#=================================================================================== 
 	def changeFileName(self):
 		count = 1;
 		fname = self.filename
@@ -62,6 +95,11 @@ class FTClient(object):
 			count = count + 1
 			fname = self.filename
 
+	#===============================FTClient.connect()==================================
+	# Handles the connection of sockets. If isDataSocket equals false
+	# the program connects to self.clientsocket, if true the connection
+	# is self.datasocket.
+	#===================================================================================
 	def connect(self, isDatasocket):
 		if isDatasocket == True:
 			try:
@@ -80,7 +118,13 @@ class FTClient(object):
 				self.clientsocket.connect((self.serverhost, int(self.serverport)))
 			except socket.error as msg:
 				print str(str(msg[0]) + ":" + str(msg[1]) + "(socket connect)")
-	
+
+	#===============================FTClient.sendCommand()==================================
+	# Handles the sending of commands to ftserver. If the command is -l self.filename is 
+	# changed to 'DIR.txt' to read the directory file when it arrives. If the command was 
+	# accepted by ftserver then a message will be displayed and FTClient.recieveFile() will
+	# handle the transfer. If a -g command fails the program will exit.
+	#======================================================================================== 	
 	def sendCommand(self):
 		#If the command is list
 		if self.command == "-l":
@@ -106,6 +150,7 @@ class FTClient(object):
 			else:
 				print str(self.serverhost + ":" + self.serverport + " says: " + recieved)
 				exit(1)
+
 	#===============================FTClient.recieveFile()===================================
 	# Handles the recieving of files from ftserver. If the current filename is a duplicate 
 	# of a file already on disk then the file name will be changed as per one of the following 
@@ -137,7 +182,6 @@ class FTClient(object):
 				buf = self.datasocket.recv(1024)
 				if buf == "":
 					count = count + 1
-					print count
 					if count > 3:
 						break
 					else:
@@ -154,8 +198,9 @@ class FTClient(object):
 			fr.close()
 			os.remove("DIR.txt")
 		else:
-			print "File transfer complete."				
+			print "File transfer complete."	
 
+#-----------Main--------------
 if __name__ == '__main__':
 	testClient = FTClient()
 	testClient.isValid()
@@ -164,11 +209,4 @@ if __name__ == '__main__':
 	testClient.connect(True)
 	testClient.recieveFile()
 	del testClient
-
-
-
-
-
-
-
-
+	exit(0)
