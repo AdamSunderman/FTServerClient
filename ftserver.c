@@ -1,4 +1,5 @@
 /*
+                                     Written By: Adam Sunderman 
    ftserver.c - ftserver is a TCP file transfer program that operates in conjuncture with ftclient.py.
                 ftserver will wait on <CONTROL_PORT_NUM> specified at launch for incoming connections from
                 ftclient. When a connection is made ftserver will parse the incoming command and fulfill
@@ -6,7 +7,7 @@
                 to list ftserver's directory contents. ftserver will continue to listen on <CONTROL_PORT_NUM>
                 until the SIG_INT signal is sent (cntl^c).
 
-        usage - ./ftserver <CONTROL_PORT_NUM>
+        usage - ./ftserver <CONTROL_PORT_NUM>   ** <CONTROL_PORT_NUM> must be in range {1024,...,65535}, inclusive **
       example - ./ftserver 30020
 */
 

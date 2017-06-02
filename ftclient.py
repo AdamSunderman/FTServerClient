@@ -4,9 +4,25 @@ import sys
 import errno
 import os
 
-#---------------------------------------------------------------------------------
-#                  File Transfer Client class ( FTClient )                        
-#---------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------
+#            File Transfer Client class (FTClient)     Written By: Adam Sunderman                        
+#-------------------------------------------------------------------------------------------
+# ftclient.py: ftclient.py is a TCP file transfer program that operates in conjuncture with 
+#              ftserver.c. ftserver waits on <CONTROL_PORT_NUM> specified at it's launch 
+#              for incoming connections from ftclient. When a connection is made ftserver 
+#              will parse ftclient's incoming command and fulfill the request if possible. 
+#              The options allowed are <-g> <FILENAME> to get a file from ftserver and <-l> 
+#              to list ftserver's directory contents. If a command entered is invalid ftclient
+#              will display a message and close. If a filename entered is invalid ftserver 
+#              will send an error message and ftclient will close. If a command is valid 
+#              ftclient will execute the command and then close diplaying status messages
+#              throughout execution. If the command was -l, list the directory of ftserver,
+#              ftserver will send a file 'DIR.txt' to ftclient. ftclient will print out the 
+#              files contents then delete the file before closing as this is meant to be a 
+#              temp file. If the command was -g, get file from ftserver, ftclient will save 
+#              the requested file in the current working directory and close, diplaying status 
+#              messages during execution.              
+#-------------------------------------------------------------------------------------------
 # attributes: FTClient.clientsocket - control connection socket file descriptor 
 #             FTClient.datasocket - data connection socket file descriptor        
 #             FTClient.serverport - control connection port number
@@ -14,7 +30,7 @@ import os
 #			  FTClient.serverhost - ftservers hostname
 #             FTClient.command - command to send 
 #             FTClient.filename - file to request ('NA' if command is -l list)
-#---------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------
 # functions:  FTClient.__init__(self)
 #             FTClient.__del__(self)
 #             FTClient.isValid(self)
@@ -23,8 +39,35 @@ import os
 #             FTClient.sendCommand(self)
 #             FTClient.recieveFile(self)
 #        ** see member function decriptions below **
-#---------------------------------------------------------------------------------
+#-------------------------------------------------------------------------------------------
+#
+# usage:  ./ftclient.py <HOST_NAME> <CONTROL_PORT_NUM> <COMMAND> <FILENAME> <DATA_PORT_NUM>
+#
+# example(list): ./ftclient.py flip1 30020 -l 30021
+#
+# example(get):  ./ftclient.py flip1 30020 -g file.pdf 30021
+#
+#  ** May need to run the command 'chmod +x ftclient.py' to get executable permissions **
+#-------------------------------------------------------------------------------------------
+#
+#        <HOST_NAME>: Host name of ftserver. Should be a fully qualified domain name, 
+#                     localhost or ip.
 # 
+# <CONTROL_PORT_NUM>: Control port number to connect to ftserver. Should be the port number
+#                     that ftserver is currently recieving connections on. Must be in range
+#                     {1024,...,65535}, inclusive.
+#
+#          <COMMAND>: The command to send to ftserver. Must be either -l (list) or -g (get).
+#                     When the command is -l the parameter <FILENAME> should be excluded. When
+#                     the command is -g the parameter <FILENAME> must be included. 
+#
+#         <FILENAME>: The name of the file for ftserver to send on a -g (get) request. Should
+#                     be a full file name including extention but without path information. No
+#                     quotations.
+# 
+#    <DATA_PORT_NUM>: Data port number for ftserver to send the request back to. Must be in 
+#                     range {1024,...,65535}, inclusive.
+#-------------------------------------------------------------------------------------------
 class FTClient(object):
 
 	#===============================FTClient.__init__()===========================
@@ -60,7 +103,7 @@ class FTClient(object):
 			self.datasocket.close()
 
 	#===============================FTClient.isValid()===========================
-	# validates FTClient's port number and commands from launch
+	# validates FTClient's port numbers and commands from launch
 	#============================================================================
 	def isValid(self):
 		sp = int(self.serverport)
