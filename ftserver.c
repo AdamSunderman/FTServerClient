@@ -9,6 +9,13 @@
 
         usage - ./ftserver <CONTROL_PORT_NUM>   ** <CONTROL_PORT_NUM> must be in range {1024,...,65535}, inclusive **
       example - ./ftserver 30020
+
+
+ Extra Credit - ./ftserver can send any file type. Such as: TXT, PDF, JPEG, MP4, ZIP, etc... 
+
+      Sources - Beej's Guide To Network Programming.         http://beej.us/guide/bgnet/ 
+                Help with printing directories.              http://www.sanfoundry.com/c-program-list-files-directory/
+                Various functon and error code lookups       http://man7.org/
 */
 
 #include <stdio.h>
@@ -56,14 +63,14 @@ typedef struct ConnectionReturnData{
 //ftserver [arg[0]=ftserver, arg[1]=<CONTROL_PORT_NUM>]. Also validates 
 //that <CONTROL_PORT_NUM> in the range {1025,...,65534} inclusive. 
 //----------------------------------------------------------------------
-void validateArgs(int ac, char const* av){
+void validateArgs(int ac, char const * av){
 
     if(ac != 2){
         fprintf(stderr, "Need two arguments(%d)\n", ac);
         exit(1);
     }
 
-    int v = stoi(av[1]);
+    int v = atoi(av);
     if( v <= 1024 || v >= 65535){
         fprintf(stderr, "Need port number in range {1025,...,65534} (%d)\n", v);
         exit(1);
@@ -188,7 +195,7 @@ void buildDir(){
 //command from ftclient was (-l) list.
 //-------------------------------------------------------------------------------
 void mSendFile(char* ip, char* port, char* file, int sockfd){
-    //sleep to allow ftclient to connect
+    //sleep to allow ftclient to setup socket
     sleep(5);
     CRD dataconnection = initializeConnection(ip, port, FALSE);
     FILE *fp;
@@ -352,7 +359,7 @@ void listenWait(int sockfd){
 
 int main(int argc, char const *argv[]){
     //validate args
-    validateArgs(argc, argv);
+    validateArgs(argc, argv[1]);
     //setup control port
     CRD listenConnection = initializeConnection(NULL, (char*) argv[1], TRUE);
     //wait for ftclient

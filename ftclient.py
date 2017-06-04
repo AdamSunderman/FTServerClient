@@ -4,6 +4,11 @@ import sys
 import errno
 import os
 
+#      Sources - Beej's Guide To Network Programming.         http://beej.us/guide/bgnet/ 
+#                Python sockets reference.                    https://docs.python.org/2/library/socket.html
+#                Python class/object reference                https://docs.python.org/2/reference/datamodel.html
+#
+# Extra Credit - ./ftclient can recieve any file type. Such as: TXT, PDF, JPEG, MP4, ZIP, etc... 
 #-------------------------------------------------------------------------------------------
 #            File Transfer Client class (FTClient)     Written By: Adam Sunderman                        
 #-------------------------------------------------------------------------------------------
