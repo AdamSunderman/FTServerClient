@@ -16,7 +16,8 @@
                                 'test.zip' : a compressed file that contains all (6) files above 
 
                                                   ** Important **
-                     ** ftclient will rename recieved files if in the same directory as ftserver **
+                      ** Tested on flip1, flip2, flip3 and localhost using various port numbers **
+                     ** FTClient will rename recieved files if in the same directory as FTServer **
                     ** Please read below for build and run instructions plus other important info. **
 
 

@@ -1,0 +1,12 @@
+This is line 1 of the test text file for ftserver and ftclient
+This is line 2 please try sending some of the other files
+Included are some various test files to validate that ftserver and ftclient 
+can handle various file types. All of these files are named 'test' but with 
+various extentions. There are the following files: 
+
+'test.jpeg' : a simple test image
+ 'test.pdf' : a simple formatted document 
+ 'text.txt' : a simple text file with several lines of text 
+ 'test.exe' : a binary executable written in c that simply prints "Hello World" 
+ 'test.mp4' : a mid-sized video file
+ 'test.zip' : a compressed file that contains all (5) files above 
